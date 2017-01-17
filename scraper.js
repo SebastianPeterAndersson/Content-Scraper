@@ -1,14 +1,11 @@
-var http = require('http');
+var http = require('http'),
+    request = require("request"),
+    cheerio = require("cheerio"),
+    fs = require("fs"),
+    json2csv = require('json2csv');
 
-var hostname = '127.0.0.1';
-var port = 3000;
 
-var server = http.createServer(function(req,res) {
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/plain');
-  res.end('Hello World\n');
-});
-
-server.listen(port, hostname, function() {
-  console.log("Server running on port " + port + " and on hostname 127.0.0.1");
-});
+    // Create data directory if there already isn't one
+    if (!fs.existsSync("data")) {
+        fs.mkdirSync("data");
+    }
