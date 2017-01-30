@@ -9,7 +9,9 @@
   "author": "Sebastian Andersson",
   "license": "ISC",
   "dependencies": {
+    "async": "^2.1.4",
     "cheerio": "^0.22.0",
+    "fs-extra": "^2.0.0",
     "json2csv": "^3.7.3",
     "nodemon": "^1.11.0",
     "request": "^2.79.0"
