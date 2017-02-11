@@ -1,111 +1,190 @@
 var http = require('http'),
+
     // For sending request to a website:
     request = require("request"),
+
     // For scraping the website with jQuery-familiar syntax:
     cheerio = require("cheerio"),
+
     fs = require('fs-extra'),
+
     // For converting list of objects to a CSV file:
-    json2csv = require('json2csv');
+    json2csv = require('json2csv'),
 
-var shirtArr = [];
-var arr = [];
-var fields = ["title", "price", "imgurl", "url", "time"];
+    // For nice date displaying:
+    moment = require('moment');
 
+// CSV fields:
+var fields = ["title", "price", "imgurl", "url", "time"],
+
+// The main url to visit:
+mainurl = "http://www.shirts4mike.com/shirts.php",
+
+// The array that are to be filled by all the urls:
+urlArr = [];
 
 // Create data directory if there already isn't one
 if (!fs.existsSync("data")) {
     fs.mkdirSync("data");
 }
 
-fs.emptyDir('siteHTML', function(err) {
-    if (err) {
-        console.log(err);
-    }
-});
+// DATES:
+var now = new Date()
+var year = now.getFullYear()
+var month = now.getUTCMonth()
+var date = now.getDate()
 
+// DATE:
+var now = moment()
+var currentTime = now.format('llll')
 
+// Name of file:
+var fullDate = year + "-" + month + "-" + date + ".csv"
 
-function req(url) {
+// Return a the body of the main page url as a promise.
+// This because the task is not synced originally.
+function returnBody(url) {
+    return new Promise(function(resolve, reject){
+        request(url, function(error, response, body) {
+            if (error) {
+                reject("\n" + currentTime + " - Page could not be found. The main URL is invalid.")
+                console.log(error)
+            }
+            resolve(body)
+        })
+    })
+}
+
+// Get each body of each link provided by the returnBody function
+// This is run in a for loop and push each instance to an array.
+// Then return the array in a Promise.all()
+function getShirts(url) {
     return new Promise(function(resolve, reject) {
-        request(url, function(err, res, body) {
-            resolve(body);
-        });
-    });
+        request(url, function(error, response, body) {
+            if (error) {
+                reject("\n" + currentTime + " - One or more pages could not be found. Please try again.")
+                console.log(error)
+            }
+            resolve(body)
+
+        })
+    })
 }
 
-var promises = req("http://www.shirts4mike.com/shirts.php");
-promises
-    .then(function(value) {
-        var $ = cheerio.load(value);
-        return $;
-    })
-    .then(function(nextValue) {
-        // Here I am getting each url from the main site and returning
-        // the array for the next "then":
-        nextValue("ul.products li a").each(function() {
-            var shirtUrl = nextValue(this).attr("href");
-            arr.push("http://www.shirts4mike.com/" + shirtUrl);
-        });
-        return arr;
-    })
-    // Here I am creating one file for each page and storing the data within each one:
-    .then(function(nextValue) {
-        var finished = 0;
-        for (var i = 0; nextValue.length > i; i++) {
-            var stream = request(nextValue[i])
-                .pipe(fs.createWriteStream("siteHTML/" + i + ".txt"));
-            stream.on("finish", function() {
-                console.log(i); // returns eight "8". Why I don't know.
-            });
+//Construct the json with
+
+function constructJSON(arr, i) {
+    return new Promise(function(resolve, reject) {
+        var json = {}
+        if (!arr) {
+            reject("\n" + currentTime + " - Could not construct JSON. Please try again")
         }
+        json.title = $(".shirt-details h1").text().slice(4)
+        json.price = $("span.price").text()
+        json.imgurl = $(".shirt-picture span img").attr("src")
+        json.url = "http://www.shirts4mike.com/" + urlArr[i]
+        json.time = currentTime
+        resolve (arr.push(json))
+
 
     })
-    // Here I am using what's now in the siteHTML folder
-    .then(function(nextValue) {
-        readFiles("siteHTML/", function(filename, content) {
-            var data = {};
-            // Here I'm getting the content each file
-            data[filename] = content;
-            console.log(content); // the content returns all 8 blank responses.
 
-        }, function(err) {
-            throw err;
-        });
+}
+
+// Disable this if you wish to only keep the current information about the state of the website:
+
+fs.readdir("./data", function(err, files) {
+    if(err) {
+        console.log(err)
+    }
+    for (var i = 0; files.length > i; i++) {
+        fs.unlink("./data/" + files[i], function(){
+            console.log("All files within the Data folder removed. Now waiting to create a fresh one.")
+        })
+    }
+})
+
+// ––––––––––––––––––––|
+// PROMISES START HERE:|
+returnBody(mainurl)//––|
+
+// Passing the information returned from the returnBody function,
+// i.e. the body of the main page:
+.then(function(html){
+
+    // Load the HTML to the cheerio object:
+    var $ = cheerio.load(html)
+
+    // Declare scope array:
+    var arr = []
+
+    // Loop through each link on the main page, each as a promise, and store it in the scoped array:
+    $("ul.products li a").each(function(){
+        arr.push(($(this).attr("href")))
+        urlArr.push(($(this).attr("href")))
+
     })
 
+    // Return the promises ONLY when if they were all resolved:
+    return Promise.all(arr)
 
+})
 
-    .catch(function(err) {
-        console.log(err);
-    });
+// The array of shirt URL's go in here:
+.then(function(shirts) {
 
-// ----------------------- .
-// FUNCTIONS-------------- .
-// ----------------------- .
+    // Declare scope array:
+    var arr = []
 
-// This is the function where i get each file which I've generated, in the
-// folder that contains them:
-// I am calling the function below.
-function readFiles(dirname, onFileContent, onError) {
-    fs.readdir(dirname, function(err, filenames) {
+    // Loop through the array, run the getShirts function which returns the body of each url:
+    for (var i = 0; shirts.length > i; i++) {
+
+        // Push each HTML body:
+        arr.push(getShirts("http://www.shirts4mike.com/" + shirts[i]))
+
+    }
+
+    // Return the body of each page ONLY if they are all finished
+    return Promise.all(arr)
+
+})
+
+// Array of bodies:
+.then(function(body) {
+
+    // Declare scope array:
+    var arr = []
+
+    //For each body, construct a json file, but only when cheerio has loaded it:
+    for (var i = 0; body.length > i; i++) {
+        if ($ = cheerio.load(body[i])) {
+            constructJSON(arr, i)
+        }
+    }
+
+    // Return the array filled with JSON:
+    return Promise.all(arr)
+
+})
+
+// The json array:
+.then(function(realjson) {
+
+    // Convert the json to a csv file:
+    var csv = json2csv({ data: realjson, fields: fields })
+    fs.writeFile("./data/" + fullDate, csv, function(err) {
         if (err) {
-            onError(err);
-            return;
+            console.log(err)
         }
-        filenames.forEach(function(filename) {
-            fs.readFile(dirname + filename, "utf8", function(err, content) {
-                if (err) {
-                    onError(err);
-                    return;
-                }
-                onFileContent(filename, content);
-            });
-        });
-    });
-}
+        console.log("File successfully created. It's located inside the 'data' folder.")
+    })
+})
 
+// Catch all errors and log it to the error logger file:
+.catch(function(err) {
+    fs.appendFile("error.log", err, function(){
+        console.log("Error logged")
+    })
+})
 
-
-
-
-console.log("Server running in the terminal");
+console.log("Server running in the terminal")
