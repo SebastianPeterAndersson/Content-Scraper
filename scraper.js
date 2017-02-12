@@ -29,17 +29,18 @@ if (!fs.existsSync("data")) {
 }
 
 // DATES:
-var now = new Date()
-var year = now.getFullYear()
-var month = now.getUTCMonth()
-var date = now.getDate()
+var now = new Date();
+var year = now.getFullYear();
+var month = now.getMonth() + 1;
+var date = now.getDate();
+console.log(month);
 
 // DATE:
-var now = moment()
-var currentTime = now.format('llll')
+var now = moment();
+var currentTime = now.format('llll');
 
 // Name of file:
-var fullDate = year + "-" + month + "-" + date + ".csv"
+var fullDate = year + "-" + month + "-" + date + ".csv";
 
 // Return a the body of the main page url as a promise.
 // This because the task is not synced originally.
@@ -47,12 +48,12 @@ function returnBody(url) {
     return new Promise(function(resolve, reject){
         request(url, function(error, response, body) {
             if (error) {
-                reject("\n" + currentTime + " - Page could not be found. The main URL is invalid.")
-                console.log(error)
+                reject("\n" + currentTime + " - Page could not be found. The main URL is invalid.");
+                console.log(error);
             }
-            resolve(body)
-        })
-    })
+            resolve(body);
+        });
+    });
 }
 
 // Get each body of each link provided by the returnBody function
@@ -62,32 +63,32 @@ function getShirts(url) {
     return new Promise(function(resolve, reject) {
         request(url, function(error, response, body) {
             if (error) {
-                reject("\n" + currentTime + " - One or more pages could not be found. Please try again.")
-                console.log(error)
+                reject("\n" + currentTime + " - One or more pages could not be found. Please try again.");
+                console.log(error);
             }
-            resolve(body)
+            resolve(body);
 
-        })
-    })
+        });
+    });
 }
 
 //Construct the json with
 
 function constructJSON(arr, i) {
     return new Promise(function(resolve, reject) {
-        var json = {}
+        var json = {};
         if (!arr) {
-            reject("\n" + currentTime + " - Could not construct JSON. Please try again")
+            reject("\n" + currentTime + " - Could not construct JSON. Please try again");
         }
-        json.title = $(".shirt-details h1").text().slice(4)
-        json.price = $("span.price").text()
-        json.imgurl = $(".shirt-picture span img").attr("src")
-        json.url = "http://www.shirts4mike.com/" + urlArr[i]
-        json.time = currentTime
-        resolve (arr.push(json))
+        json.title = $(".shirt-details h1").text().slice(4);
+        json.price = $("span.price").text();
+        json.imgurl = $(".shirt-picture span img").attr("src");
+        json.url = "http://www.shirts4mike.com/" + urlArr[i];
+        json.time = currentTime;
+        resolve (arr.push(json));
 
 
-    })
+    });
 
 }
 
@@ -95,14 +96,14 @@ function constructJSON(arr, i) {
 
 fs.readdir("./data", function(err, files) {
     if(err) {
-        console.log(err)
+        console.log(err);
     }
     for (var i = 0; files.length > i; i++) {
         fs.unlink("./data/" + files[i], function(){
-            console.log("All files within the Data folder removed. Now waiting to create a fresh one.")
-        })
+            console.log("All files within the Data folder removed. Now waiting to create a fresh one.");
+        });
     }
-})
+});
 
 // ––––––––––––––––––––|
 // PROMISES START HERE:|
@@ -113,20 +114,20 @@ returnBody(mainurl)//––|
 .then(function(html){
 
     // Load the HTML to the cheerio object:
-    var $ = cheerio.load(html)
+    var $ = cheerio.load(html);
 
     // Declare scope array:
-    var arr = []
+    var arr = [];
 
     // Loop through each link on the main page, each as a promise, and store it in the scoped array:
     $("ul.products li a").each(function(){
-        arr.push(($(this).attr("href")))
-        urlArr.push(($(this).attr("href")))
+        arr.push(($(this).attr("href")));
+        urlArr.push(($(this).attr("href")));
 
-    })
+    });
 
     // Return the promises ONLY when if they were all resolved:
-    return Promise.all(arr)
+    return Promise.all(arr);
 
 })
 
@@ -134,18 +135,18 @@ returnBody(mainurl)//––|
 .then(function(shirts) {
 
     // Declare scope array:
-    var arr = []
+    var arr = [];
 
     // Loop through the array, run the getShirts function which returns the body of each url:
     for (var i = 0; shirts.length > i; i++) {
 
         // Push each HTML body:
-        arr.push(getShirts("http://www.shirts4mike.com/" + shirts[i]))
+        arr.push(getShirts("http://www.shirts4mike.com/" + shirts[i]));
 
     }
 
     // Return the body of each page ONLY if they are all finished
-    return Promise.all(arr)
+    return Promise.all(arr);
 
 })
 
@@ -153,17 +154,17 @@ returnBody(mainurl)//––|
 .then(function(body) {
 
     // Declare scope array:
-    var arr = []
+    var arr = [];
 
     //For each body, construct a json file, but only when cheerio has loaded it:
     for (var i = 0; body.length > i; i++) {
         if ($ = cheerio.load(body[i])) {
-            constructJSON(arr, i)
+            constructJSON(arr, i);
         }
     }
 
     // Return the array filled with JSON:
-    return Promise.all(arr)
+    return Promise.all(arr);
 
 })
 
@@ -171,20 +172,20 @@ returnBody(mainurl)//––|
 .then(function(realjson) {
 
     // Convert the json to a csv file:
-    var csv = json2csv({ data: realjson, fields: fields })
+    var csv = json2csv({ data: realjson, fields: fields });
     fs.writeFile("./data/" + fullDate, csv, function(err) {
         if (err) {
-            console.log(err)
+            console.log(err);
         }
-        console.log("File successfully created. It's located inside the 'data' folder.")
-    })
+        console.log("File successfully created. It's located inside the 'data' folder.");
+    });
 })
 
 // Catch all errors and log it to the error logger file:
 .catch(function(err) {
     fs.appendFile("error.log", err, function(){
-        console.log("Error logged")
-    })
-})
+        console.log("Error logged");
+    });
+});
 
-console.log("Server running in the terminal")
+console.log("Server running in the terminal");
